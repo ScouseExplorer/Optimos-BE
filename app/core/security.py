@@ -34,10 +34,34 @@ def create_access_token(
     return encoded_jwt
 
 
+def create_refresh_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    """Create JWT refresh token (longer expiry)."""
+    to_encode = data.copy()
+    now = datetime.now(timezone.utc)
+    # Refresh tokens last 7 days by default
+    expire = now + (expires_delta or timedelta(days=7))
+    to_encode.update({"type": "refresh", "iat": int(now.timestamp()), "exp": int(expire.timestamp())})
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
+
+
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
     """Decode JWT access token."""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload
+    except ExpiredSignatureError:
+        return None
+    except JWTError:
+        return None
+
+
+def decode_refresh_token(token: str) -> Optional[Dict[str, Any]]:
+    """Decode JWT refresh token."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "refresh":
+            return None
         return payload
     except ExpiredSignatureError:
         return None

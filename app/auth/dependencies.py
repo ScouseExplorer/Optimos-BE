@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.user import User
+from app.services.token_service import is_token_blacklisted
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
@@ -15,6 +16,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    # Check if token is blacklisted (logged out)
+    if is_token_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked (logged out)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     payload = decode_access_token(token)
     if payload is None:

@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/optimos"
     
+    # Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
