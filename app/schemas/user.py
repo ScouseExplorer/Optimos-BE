@@ -12,17 +12,8 @@ class UserCreate(UserBase):
     password: str
 
 
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-
 class User(UserBase):
-    id: str
+    id: int
     
     class Config:
         from_attributes = True
-
-
-class UserInDB(User):
-    hashed_password: str

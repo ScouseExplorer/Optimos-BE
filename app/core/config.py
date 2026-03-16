@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Dict
 
 
 class Settings(BaseSettings):
@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
+    # Test User
+    TEST_USER: Dict[str, str] = {
+        "username": "testuser",
+        "password": "testpass123"
+    }
+    
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",
@@ -19,7 +25,7 @@ class Settings(BaseSettings):
     ]
     
     # Database
-    DATABASE_URL: str = "sqlite:///./optimos.db"
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/optimos"
     
     class Config:
         env_file = ".env"
