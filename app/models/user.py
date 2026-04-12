@@ -13,6 +13,10 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
+    is_email_verified = Column(Boolean, default=False, index=True)
+    email_verification_token = Column(String, nullable=True)
+    password_reset_token = Column(String, nullable=True)
+    password_reset_expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     
     # Relationships

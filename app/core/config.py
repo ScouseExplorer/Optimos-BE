@@ -30,6 +30,17 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
     
+    # Email Configuration
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = "your-email@gmail.com"
+    SMTP_PASSWORD: str = "your-app-password"
+    SMTP_FROM_EMAIL: str = "noreply@optimos.com"
+    SMTP_FROM_NAME: str = "Optimos"
+    
+    # Email Links (for verification/reset links in emails)
+    FRONTEND_URL: str = "http://localhost:3000"
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

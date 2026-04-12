@@ -1,20 +1,27 @@
 from time import time
 from typing import Dict
 from collections import defaultdict
+import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import auth, users, chats, admin, subscriptions
 from app.core.config import settings
+from app.core.logging import setup_logging, get_logger
 from app.db.base import Base
 from app.db.session import engine
 from app.models import User, Subscription, Chat
+from app.middleware.logging import LoggingMiddleware, ErrorLoggingMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+# Initialize logging
+setup_logging()
+logger = get_logger(__name__)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+logger.info("Database tables initialized")
 
 app = FastAPI(
     title="Optimos Backend API",
@@ -56,7 +63,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return response
 
 
-# Add middleware
+# Add middleware (order matters - added in reverse order of execution)
+app.add_middleware(ErrorLoggingMiddleware)
+app.add_middleware(LoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
 

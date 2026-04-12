@@ -1,8 +1,11 @@
 from typing import Optional
+import logging
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, User
 from app.core.security import get_password_hash, verify_password
 from app.models.user import User as UserModel
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -18,29 +21,52 @@ class UserService:
     
     async def create_user(self, db: Session, user_data: UserCreate) -> User:
         """Create a new user in the database."""
-        # Hash the password
-        hashed_password = get_password_hash(user_data.password)
-        
-        # Create user object
-        user_in_db = UserModel(
-            email=user_data.email,
-            username=user_data.username,
-            hashed_password=hashed_password,
-            is_active=True
-        )
-        
-        # Save to database
-        db.add(user_in_db)
-        db.commit()
-        db.refresh(user_in_db)
-        
-        # Return user without password hash
-        return User(
-            id=user_in_db.id,
-            email=user_in_db.email,
-            username=user_in_db.username,
-            is_active=user_in_db.is_active
-        )
+        try:
+            # Hash the password
+            hashed_password = get_password_hash(user_data.password)
+            
+            # Create user object
+            user_in_db = UserModel(
+                email=user_data.email,
+                username=user_data.username,
+                hashed_password=hashed_password,
+                is_active=True
+            )
+            
+            # Save to database
+            db.add(user_in_db)
+            db.commit()
+            db.refresh(user_in_db)
+            
+            logger.info(
+                f"User created successfully",
+                extra={
+                    "user_id": user_in_db.id,
+                    "email": user_data.email,
+                    "username": user_data.username,
+                    "event": "user_created"
+                }
+            )
+            
+            # Return user without password hash
+            return User(
+                id=user_in_db.id,
+                email=user_in_db.email,
+                username=user_in_db.username,
+                is_active=user_in_db.is_active
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to create user: {str(e)}",
+                extra={
+                    "email": user_data.email,
+                    "username": user_data.username,
+                    "event": "user_creation_failed",
+                    "error": str(e)
+                },
+                exc_info=True
+            )
+            raise
     
     async def get_user_by_username(self, db: Session, username: str) -> Optional[UserModel]:
         """Get user by username from database."""
@@ -48,12 +74,48 @@ class UserService:
     
     async def authenticate_user(self, db: Session, username: str, password: str) -> Optional[UserModel]:
         """Authenticate a user with username and password."""
-        user = await self.get_user_by_username(db, username)
-        if not user:
-            return None
-        if not verify_password(password, user.hashed_password):
-            return None
-        return user
+        try:
+            user = await self.get_user_by_username(db, username)
+            if not user:
+                logger.warning(
+                    f"Login attempt with non-existent username",
+                    extra={
+                        "username": username,
+                        "event": "login_failed_user_not_found"
+                    }
+                )
+                return None
+            if not verify_password(password, user.hashed_password):
+                logger.warning(
+                    f"Login attempt with wrong password",
+                    extra={
+                        "user_id": user.id,
+                        "username": username,
+                        "event": "login_failed_wrong_password"
+                    }
+                )
+                return None
+            
+            logger.info(
+                f"User authenticated successfully",
+                extra={
+                    "user_id": user.id,
+                    "username": username,
+                    "event": "user_authenticated"
+                }
+            )
+            return user
+        except Exception as e:
+            logger.error(
+                f"Authentication error: {str(e)}",
+                extra={
+                    "username": username,
+                    "event": "authentication_error",
+                    "error": str(e)
+                },
+                exc_info=True
+            )
+            raise
     
     async def update_user(self, db: Session, user_id: int, user_data: dict) -> Optional[User]:
         """Update user information."""
