@@ -4,9 +4,10 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.base import Base
+from app.db.mixins import AuditMixin
 
 
-class Subscription(Base):
+class Subscription(Base, AuditMixin):
     """User subscription plan and tier information."""
     
     __tablename__ = "subscriptions"
@@ -17,7 +18,6 @@ class Subscription(Base):
     status = Column(String, default="active", index=True)  # active, cancelled, expired
     messages_limit = Column(Integer, default=100)  # monthly message limit
     messages_used = Column(Integer, default=0)  # current month usage
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
     renews_at = Column(DateTime, nullable=True, index=True)  # next billing date
     cancelled_at = Column(DateTime, nullable=True)
     

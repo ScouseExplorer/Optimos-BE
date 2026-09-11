@@ -4,9 +4,10 @@ from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.base import Base
+from app.db.mixins import AuditMixin
 
 
-class Chat(Base):
+class Chat(Base, AuditMixin):
     """Chat message history between user and AI."""
     
     __tablename__ = "chats"
@@ -17,7 +18,6 @@ class Chat(Base):
     user_message = Column(Text, nullable=False)  # what user sent
     ai_response = Column(Text, nullable=False)  # what AI replied
     tokens_used = Column(Integer, default=0)  # for tracking usage
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
     
     # Relationships
     user = relationship("User", back_populates="chats")

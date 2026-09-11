@@ -1,14 +1,12 @@
+import time as _time
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt, ExpiredSignatureError
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
 
 from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -67,3 +65,37 @@ def decode_refresh_token(token: str) -> Optional[Dict[str, Any]]:
         return None
     except JWTError:
         return None
+
+
+def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
+    """Decode JWT access token — rejects refresh tokens."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        # Reject if someone tries to use a refresh token as an access token
+        if payload.get("type") == "refresh":
+            return None
+        return payload
+    except ExpiredSignatureError:
+        return None
+    except JWTError:
+        return None
+
+
+def get_token_remaining_ttl(token: str) -> int:
+    """Return remaining lifetime of a token in seconds (minimum 1).
+
+    Decodes without verifying expiry so we can read the exp claim even
+    from an already-expired token — useful for setting blacklist TTLs.
+    """
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"verify_exp": False},
+        )
+        exp = payload.get("exp", 0)
+        remaining = int(exp - _time.time())
+        return max(remaining, 1)
+    except Exception:
+        return 3600  # safe fallback

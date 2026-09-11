@@ -1,8 +1,15 @@
 from typing import Optional
+from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, User
 from app.core.security import get_password_hash, verify_password
 from app.models.user import User as UserModel
+from app.models.subscription import Subscription
+from app.models.profile import UserProfile
+from app.models.notification_preferences import NotificationPreferences
+from app.models.security_settings import SecuritySettings
+from datetime import datetime, timedelta
 
 
 class UserService:
@@ -31,28 +38,78 @@ class UserService:
         
         # Save to database
         db.add(user_in_db)
+        db.flush()  # get user_in_db.id before committing
+
+        # Create default free subscription for new user
+        subscription = Subscription(
+            user_id=user_in_db.id,
+            tier="free",
+            status="active",
+            messages_limit=100,
+            messages_used=0,
+            renews_at=datetime.utcnow() + timedelta(days=30),
+        )
+        db.add(subscription)
+
+        # Create default profile
+        db.add(UserProfile(user_id=user_in_db.id))
+
+        # Create default notification preferences
+        db.add(NotificationPreferences(user_id=user_in_db.id))
+
+        # Create default security settings
+        db.add(SecuritySettings(user_id=user_in_db.id))
+
         db.commit()
         db.refresh(user_in_db)
-        
+
         # Return user without password hash
         return User(
             id=user_in_db.id,
             email=user_in_db.email,
             username=user_in_db.username,
-            is_active=user_in_db.is_active
+            is_active=user_in_db.is_active,
         )
     
     async def get_user_by_username(self, db: Session, username: str) -> Optional[UserModel]:
         """Get user by username from database."""
         return db.query(UserModel).filter(UserModel.username == username).first()
-    
-    async def authenticate_user(self, db: Session, username: str, password: str) -> Optional[UserModel]:
-        """Authenticate a user with username and password."""
-        user = await self.get_user_by_username(db, username)
+
+    async def get_user_by_username_or_email(self, db: Session, login: str) -> Optional[UserModel]:
+        """Look up a user by username OR email (case-sensitive)."""
+        return (
+            db.query(UserModel)
+            .filter(or_(UserModel.username == login, UserModel.email == login))
+            .first()
+        )
+
+    async def authenticate_user(self, db: Session, username_or_email: str, password: str) -> Optional[UserModel]:
+        """Authenticate a user by username or email.
+
+        Raises HTTP 423 if the account is locked.
+        Returns None if credentials are wrong (and records the failed attempt).
+        """
+        user = await self.get_user_by_username_or_email(db, username_or_email)
         if not user:
             return None
+
+        # Enforce account lockout before touching the password
+        security = db.query(SecuritySettings).filter(SecuritySettings.user_id == user.id).first()
+        if security and security.locked_until and security.locked_until > datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail="Account temporarily locked due to too many failed attempts. Try again in 30 minutes.",
+            )
+
         if not verify_password(password, user.hashed_password):
+            # Record failed attempt and potentially lock the account
+            if security:
+                security.failed_login_attempts += 1
+                if security.failed_login_attempts >= 10:
+                    security.locked_until = datetime.utcnow() + timedelta(minutes=30)
+                db.commit()
             return None
+
         return user
     
     async def update_user(self, db: Session, user_id: int, user_data: dict) -> Optional[User]:
