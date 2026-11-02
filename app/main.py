@@ -34,6 +34,9 @@ from app.services import token_service
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+# Initialize logging
+setup_logging()
+logger = get_logger(__name__)
 
 # Optional compatibility mode for local/dev environments.
 if settings.AUTO_CREATE_TABLES:

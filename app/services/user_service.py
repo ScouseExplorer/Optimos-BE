@@ -12,6 +12,8 @@ from app.models.security_settings import SecuritySettings
 from app.models.credit_wallet import CreditWallet
 from datetime import datetime, timedelta
 
+logger = logging.getLogger(__name__)
+
 
 class UserService:
     """Service class for user business logic."""
