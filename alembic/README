@@ -1,0 +1,7 @@
+Single-database Alembic setup.
+
+Useful commands:
+- alembic upgrade head
+- alembic downgrade -1
+- alembic revision -m "describe change"
+- alembic revision --autogenerate -m "autogen change"

@@ -21,6 +21,12 @@ async def read_user(
     db: Session = Depends(get_db),
 ):
     """Get user by ID."""
+    if current_user.id != user_id and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this user",
+        )
+
     user = db.query(UserModel).filter(UserModel.id == user_id).first()
     if not user:
         raise HTTPException(

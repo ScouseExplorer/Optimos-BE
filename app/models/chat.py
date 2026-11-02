@@ -18,6 +18,7 @@ class Chat(Base, AuditMixin):
     user_message = Column(Text, nullable=False)  # what user sent
     ai_response = Column(Text, nullable=False)  # what AI replied
     tokens_used = Column(Integer, default=0)  # for tracking usage
+    request_id = Column(String(128), nullable=True, index=True)
     
     # Relationships
     user = relationship("User", back_populates="chats")

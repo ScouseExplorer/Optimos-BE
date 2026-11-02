@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.auth.dependencies import get_current_active_user
 from app.models.user import User
 from app.schemas.subscription import Subscription, SubscriptionUpdate, SubscriptionCreate
+from app.services.entitlement_service import EntitlementService
 from app.services.subscription_service import SubscriptionService
 
 router = APIRouter(prefix="/api/subscriptions", tags=["subscriptions"])
@@ -60,3 +61,12 @@ async def get_usage(
         "usage_percentage": (subscription.messages_used / subscription.messages_limit * 100) if subscription.messages_limit > 0 else 0,
         "renews_at": subscription.renews_at,
     }
+
+
+@router.get("/entitlements")
+async def get_entitlements(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Get explicit entitlement contract for frontend rendering."""
+    return EntitlementService.get_user_entitlements(db, current_user.id)

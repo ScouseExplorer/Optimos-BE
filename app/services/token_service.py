@@ -1,18 +1,33 @@
 """Token blacklist management for logout functionality."""
 
+import logging
+
 import redis
 from app.core.config import settings
+from app.core.runtime_validation import redis_required
 
-# Connect to Redis
-try:
-    redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
-    redis_client.ping()  # Test connection
-    USE_REDIS = True
-except Exception as e:
-    print(f"Redis connection failed: {e}. Falling back to in-memory storage.")
+logger = logging.getLogger(__name__)
+
+# In-memory fallback (development/test only; never allowed in production/staging)
+blacklisted_tokens = set()
+
+# Connect to Redis when enabled; production/staging fail fast if it is unavailable.
+if settings.REDIS_ENABLED:
+    try:
+        redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        redis_client.ping()  # Test connection
+        USE_REDIS = True
+    except Exception as e:
+        if redis_required(settings):
+            raise RuntimeError(
+                f"Redis is required for token revocation in production/staging but is unavailable: {e}"
+            ) from e
+        logger.warning("Redis unavailable (%s); token revocation falls back to per-process memory", e)
+        USE_REDIS = False
+else:
+    if redis_required(settings):
+        raise RuntimeError("Redis is required for token revocation in production/staging")
     USE_REDIS = False
-    # In-memory fallback
-    blacklisted_tokens = set()
 
 
 def blacklist_token(token: str, expiration_seconds: int = 3600) -> None:

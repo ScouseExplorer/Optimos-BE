@@ -28,11 +28,16 @@ env/
 
 # Environment variables
 .env
+.copilot
+.backend_non_ml_coverage.md
+.thingstoconsider.md
+.FRONTEND_COPILOT_INSTRUCTION_SHEET.md
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
+*.db-journal
 
 # IDE
 .vscode/
@@ -44,3 +49,5 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+.dockerignore

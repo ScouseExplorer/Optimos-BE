@@ -9,7 +9,7 @@ from app.auth.dependencies import get_current_active_user
 from app.models.user import User
 from app.models.subscription import Subscription
 from app.models.chat import Chat
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -100,8 +100,7 @@ class UserDetail(BaseModel):
     messages_limit: int
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.get("/users", response_model=list[UserDetail])

@@ -15,7 +15,8 @@ class ChatService:
         user_id: int,
         user_message: str,
         ai_response: str,
-        tokens_used: int = 0
+        tokens_used: int = 0,
+        request_id: str | None = None,
     ) -> Chat:
         """Create a new chat message."""
         # Get user's subscription
@@ -28,12 +29,22 @@ class ChatService:
             subscription_id=subscription.id,
             user_message=user_message,
             ai_response=ai_response,
-            tokens_used=tokens_used
+            tokens_used=tokens_used,
+            request_id=request_id,
         )
         db.add(chat)
         db.commit()
         db.refresh(chat)
         return chat
+
+    @staticmethod
+    def get_chat_by_request_id(db: Session, user_id: int, request_id: str) -> Chat | None:
+        """Find an already-created chat for an idempotent request."""
+        return (
+            db.query(Chat)
+            .filter(Chat.user_id == user_id, Chat.request_id == request_id)
+            .first()
+        )
     
     @staticmethod
     def get_chat_history(db: Session, user_id: int, limit: int = 50, offset: int = 0) -> tuple:

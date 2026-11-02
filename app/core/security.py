@@ -43,17 +43,6 @@ def create_refresh_token(data: Dict[str, Any], expires_delta: Optional[timedelta
     return encoded_jwt
 
 
-def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decode JWT access token."""
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
-    except ExpiredSignatureError:
-        return None
-    except JWTError:
-        return None
-
-
 def decode_refresh_token(token: str) -> Optional[Dict[str, Any]]:
     """Decode JWT refresh token."""
     try:

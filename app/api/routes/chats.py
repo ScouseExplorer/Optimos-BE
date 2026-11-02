@@ -1,13 +1,15 @@
 """Chat routes for user chat interactions."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.auth.dependencies import get_current_active_user
 from app.models.user import User
 from app.schemas.chat import ChatCreate, ChatResponse, ChatHistory
 from app.services.chat_service import ChatService
-from app.services.subscription_service import SubscriptionService
+from app.services.ai.ai_orchestrator import AIOrchestrator
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -15,34 +17,18 @@ router = APIRouter(prefix="/api/chats", tags=["chats"])
 @router.post("", response_model=ChatResponse)
 async def send_message(
     chat_input: ChatCreate,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Send a message to AI chatbot and get response."""
-    # Check message limit
-    if not SubscriptionService.check_message_limit(db, current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Message limit reached for this month"
-        )
-    
-    # TODO: Call your AI service/API here
-    # For now, we'll create a mock response
-    ai_response = f"Echo: {chat_input.user_message}"
-    
-    # Create chat record
-    chat = ChatService.create_chat(
+    request_id = idempotency_key or str(uuid4())
+    return AIOrchestrator.generate_post_idea(
         db=db,
         user_id=current_user.id,
-        user_message=chat_input.user_message,
-        ai_response=ai_response,
-        tokens_used=len(chat_input.user_message.split())
+        prompt=chat_input.user_message,
+        request_id=request_id,
     )
-    
-    # Increment usage
-    SubscriptionService.increment_message_usage(db, current_user.id, tokens=1)
-    
-    return chat
 
 
 @router.get("", response_model=ChatHistory)

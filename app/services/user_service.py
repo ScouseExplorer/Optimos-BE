@@ -1,6 +1,6 @@
 from typing import Optional
 from fastapi import HTTPException, status
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, User
 from app.core.security import get_password_hash, verify_password
@@ -9,6 +9,7 @@ from app.models.subscription import Subscription
 from app.models.profile import UserProfile
 from app.models.notification_preferences import NotificationPreferences
 from app.models.security_settings import SecuritySettings
+from app.models.credit_wallet import CreditWallet
 from datetime import datetime, timedelta
 
 
@@ -17,7 +18,7 @@ class UserService:
     
     async def get_user_by_email(self, db: Session, email: str) -> Optional[UserModel]:
         """Get user by email from database."""
-        return db.query(UserModel).filter(UserModel.email == email).first()
+        return db.query(UserModel).filter(func.lower(UserModel.email) == email.lower()).first()
     
     async def get_user_by_id(self, db: Session, user_id: int) -> Optional[UserModel]:
         """Get user by ID from database."""
@@ -33,7 +34,7 @@ class UserService:
             email=user_data.email,
             username=user_data.username,
             hashed_password=hashed_password,
-            is_active=True
+            is_active=False,
         )
         
         # Save to database
@@ -60,6 +61,9 @@ class UserService:
         # Create default security settings
         db.add(SecuritySettings(user_id=user_in_db.id))
 
+        # Create default credit wallet
+        db.add(CreditWallet(user_id=user_in_db.id, balance=0))
+
         db.commit()
         db.refresh(user_in_db)
 
@@ -69,6 +73,7 @@ class UserService:
             email=user_in_db.email,
             username=user_in_db.username,
             is_active=user_in_db.is_active,
+            email_verified_at=user_in_db.email_verified_at,
         )
     
     async def get_user_by_username(self, db: Session, username: str) -> Optional[UserModel]:
@@ -126,7 +131,8 @@ class UserService:
             id=db_user.id,
             email=db_user.email,
             username=db_user.username,
-            is_active=db_user.is_active
+            is_active=db_user.is_active,
+            email_verified_at=db_user.email_verified_at,
         )
     
     async def delete_user(self, db: Session, user_id: int) -> bool:
