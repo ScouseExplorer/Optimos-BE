@@ -3,7 +3,7 @@ r"""One-time data migration from SQLite to PostgreSQL for Optimos backend.
 Usage (PowerShell):
   .\.venv-2\Scripts\python.exe scripts\migrate_sqlite_to_postgres.py \
     --sqlite-url "sqlite:///./optimos.db" \
-    --postgres-url "postgresql://postgres:postgres@localhost:5432/optimos"
+    --postgres-url "postgresql://postgres:postgres@localhost:5433/optimos"
 
 Notes:
 - Run `alembic upgrade head` against PostgreSQL first.

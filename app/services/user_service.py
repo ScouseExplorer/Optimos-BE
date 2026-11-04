@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_

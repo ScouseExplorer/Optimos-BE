@@ -66,6 +66,23 @@ def test_registration_requires_single_use_email_verification(client):
     ).status_code == 200
 
 
+def test_legacy_verify_email_endpoint_uses_auth_action_tokens(client):
+    email = "verify-alias@example.com"
+    register = client.post(
+        "/api/auth/register",
+        json={"email": email, "username": "verify_alias", "password": "Pass12345!"},
+    )
+    assert register.status_code == 201
+    message = latest_test_email(email, "verify")
+    token = re.search(r"[?&]token=([A-Za-z0-9_-]+)", message["text"]).group(1)
+
+    verified = client.post("/api/auth/verify-email", json={"token": token})
+    assert verified.status_code == 200
+    assert verified.json()["detail"] == "Email verified successfully"
+    replay = client.post("/api/auth/verify-email", json={"token": token})
+    assert replay.status_code == 400
+
+
 def test_password_reset_is_single_use_and_revokes_existing_sessions(client):
     email = "reset@example.com"
     user = register_user(client, email, "reset_user")

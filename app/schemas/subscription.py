@@ -21,6 +21,7 @@ class Subscription(BaseModel):
     messages_used: int
     created_at: datetime
     renews_at: Optional[datetime] = None
+    usage_resets_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
 

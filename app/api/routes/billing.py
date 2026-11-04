@@ -1,13 +1,17 @@
-import hmac
-
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_active_user
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.billing import BillingWebhookEvent, PurchaseIntentRequest, PurchaseIntentResponse
+from app.models.subscription import Subscription
+from app.schemas.billing import (
+    CustomerPortalResponse,
+    PurchaseIntentRequest,
+    PurchaseIntentResponse,
+    SubscriptionIntentRequest,
+)
 from app.services.billing_service import BillingService
 
 
@@ -15,7 +19,7 @@ router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 
 @router.post("/purchase-intent", response_model=PurchaseIntentResponse)
-async def create_purchase_intent(
+def create_purchase_intent(
     payload: PurchaseIntentRequest,
     current_user: User = Depends(get_current_active_user),
 ):
@@ -23,23 +27,61 @@ async def create_purchase_intent(
     return PurchaseIntentResponse(**data)
 
 
-@router.post("/webhooks", status_code=status.HTTP_202_ACCEPTED)
-async def handle_billing_webhook(
-    event: BillingWebhookEvent,
-    x_billing_token: str | None = Header(default=None, alias="X-Billing-Token"),
+@router.post("/subscription-intent", response_model=PurchaseIntentResponse)
+def create_subscription_intent(
+    payload: SubscriptionIntentRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    if not settings.BILLING_WEBHOOK_TOKEN:
+    existing = (
+        db.query(Subscription)
+        .filter(
+            Subscription.user_id == current_user.id,
+            Subscription.stripe_subscription_id.is_not(None),
+            Subscription.tier != "free",
+            Subscription.status.notin_(["canceled", "expired"]),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An active paid subscription already exists; use the billing portal to manage it",
+        )
+    data = BillingService.create_subscription_intent(payload.tier, current_user.id)
+    return PurchaseIntentResponse(**data)
+
+
+@router.post("/customer-portal", response_model=CustomerPortalResponse)
+def create_customer_portal(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    return BillingService.create_customer_portal(db, current_user.id)
+
+
+@router.post("/webhooks", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/stripe-webhooks", status_code=status.HTTP_202_ACCEPTED, include_in_schema=False)
+async def handle_billing_webhook(
+    request: Request,
+    stripe_signature: str | None = Header(default=None, alias="Stripe-Signature"),
+    db: Session = Depends(get_db),
+):
+    if not settings.STRIPE_WEBHOOK_SECRET:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Billing webhook token is not configured",
+            detail="Stripe webhook secret is not configured",
         )
-    # Trust boundary: this is an internal event from the billing service, which must
-    # verify the Stripe signature (STRIPE_WEBHOOK_SECRET) before calling this route.
-    if not x_billing_token or not hmac.compare_digest(
-        x_billing_token.encode(), settings.BILLING_WEBHOOK_TOKEN.encode()
-    ):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid billing webhook token")
+    raw_body = await request.body()
+    if not BillingService.verify_stripe_signature(raw_body, stripe_signature):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe signature")
 
-    BillingService.apply_webhook_credit_event(db, event)
+    try:
+        event = await request.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe event JSON") from exc
+    if not isinstance(event, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe event payload")
+
+    await BillingService.apply_stripe_event(db, event)
     return {"status": "accepted"}

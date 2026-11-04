@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.subscription import Subscription
 from app.services.credit_service import CreditService
+from app.services.subscription_service import SubscriptionService
 
 
 class EntitlementService:
@@ -33,7 +34,7 @@ class EntitlementService:
 
     @staticmethod
     def get_subscription(db: Session, user_id: int) -> Subscription | None:
-        return db.query(Subscription).filter(Subscription.user_id == user_id).first()
+        return SubscriptionService.get_subscription(db, user_id)
 
     @staticmethod
     def assert_feature_allowed(db: Session, user_id: int, feature_key: str) -> Subscription:
@@ -45,6 +46,8 @@ class EntitlementService:
             )
 
         features = EntitlementService.PLAN_FEATURES.get(sub.tier, set())
+        if sub.status != "active":
+            features = set()
         if feature_key not in features:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -66,13 +69,20 @@ class EntitlementService:
             }
 
         wallet = CreditService.get_or_create_wallet(db, user_id)
-        features = sorted(list(EntitlementService.PLAN_FEATURES.get(sub.tier, set())))
+        features = EntitlementService.PLAN_FEATURES.get(sub.tier, set())
+        if sub.status != "active":
+            features = set()
+        features = sorted(features)
         return {
             "tier": sub.tier,
             "status": sub.status,
             "messages_limit": sub.messages_limit,
             "messages_used": sub.messages_used,
-            "messages_remaining": max(0, sub.messages_limit - sub.messages_used),
+            "messages_remaining": (
+                max(0, sub.messages_limit - sub.messages_used)
+                if sub.status == "active"
+                else 0
+            ),
             "features": features,
             "credit_balance": wallet.balance,
         }

@@ -165,7 +165,7 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 For local PostgreSQL development, use:
 
 ```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/optimos
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/optimos
 POSTGRES_DB=optimos
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
@@ -185,65 +185,33 @@ Examples of rejected production config include:
 
 **⚠️ Important**: Change the `SECRET_KEY` in production!
 
-## Stripe Integration (Where To Add It)
+## Stripe Billing
 
-This backend already has billing entry points and credit-ledger handling. If you want to wire Stripe directly in this repo, implement it in these exact places:
+The backend creates Stripe Checkout Sessions directly; paid plan access is granted or updated only from verified Stripe subscription events.
 
-1. Checkout session creation:
-   - File: `app/services/billing_service.py`
-   - Method: `BillingService.create_purchase_intent(...)`
-   - Replace the current `BILLING_SERVICE_URL` proxy call with Stripe Checkout Session creation (or keep proxy mode and do it in your billing microservice).
+- `POST /api/billing/purchase-intent` starts a one-time credit purchase. Configure `STRIPE_CREDIT_PRICE_ID` as the Stripe unit price for one credit. The supplied success and cancel URLs must use the configured `FRONTEND_URL` origin.
+- `POST /api/billing/subscription-intent` accepts `{ "tier": "pro" | "enterprise" }` and returns `{ "checkout_url", "provider_intent_id" }`.
+- `POST /api/billing/customer-portal` returns a Stripe Customer Portal URL for a user with an associated Stripe customer.
+- Configure Stripe to send `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, and `invoice.payment_failed` events to `POST /api/billing/webhooks`; set `STRIPE_WEBHOOK_SECRET`. The endpoint verifies the `Stripe-Signature` and rejects stale signatures.
 
-2. Billing API endpoint surface:
-   - File: `app/api/routes/billing.py`
-   - Route: `POST /api/billing/purchase-intent`
-   - Keep this as the frontend entrypoint. It should return `{ checkout_url, provider_intent_id }`.
-
-3. Webhook verification + event handling:
-   - File: `app/api/routes/billing.py`
-   - Route: `POST /api/billing/webhooks`
-   - Current mode (billing microservice): this route is an **internal** endpoint, not Stripe-facing. It does not (and cannot) verify Stripe signatures because Stripe never calls it. The billing service MUST verify the Stripe `Stripe-Signature` header with `STRIPE_WEBHOOK_SECRET` and confirm the payment succeeded *before* sending `credits.purchased` with the shared `X-Billing-Token` (compared in constant time). Keep the billing service private and `BILLING_WEBHOOK_TOKEN` secret and long/random; without it the route returns 503.
-   - If switching to Stripe-native webhooks, verify Stripe signature here using `STRIPE_WEBHOOK_SECRET` instead of the shared token.
-
-4. Credit application (idempotent):
-   - File: `app/services/billing_service.py`
-   - Method: `BillingService.apply_webhook_credit_event(...)`
-   - Keep this method responsible for mapping provider events (e.g., `checkout.session.completed`) to credit grants.
-   - It already calls idempotent credit application via `CreditService.apply_billing_purchase(...)`.
-
-5. Ledger + wallet update logic:
-   - File: `app/services/credit_service.py`
-   - Method: `CreditService.apply_billing_purchase(...)`
-   - This is the canonical place for wallet increment + replay protection.
-
-6. DB replay safety:
-   - File: `alembic/versions/20261020_0004_billing_purchase_uniqueness.py`
-   - This migration adds DB-level uniqueness for billing purchase references.
-
-### Recommended Stripe Event Mapping
-
-- `checkout.session.completed` -> credits purchased event
-- External or metadata field should include:
-  - user id
-  - credit amount
-  - reference id (Stripe session/payment intent id)
-
-### Required Env Vars For Stripe Direct Mode
-
-Set these in `.env`:
+Configure these values in `.env`:
 
 ```env
 STRIPE_SECRET_KEY=sk_live_or_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_SUCCESS_URL=https://your-frontend/success
-STRIPE_CANCEL_URL=https://your-frontend/cancel
+STRIPE_CREDIT_PRICE_ID=price_...
+STRIPE_PRO_PRICE_ID=price_...
+STRIPE_ENTERPRISE_PRICE_ID=price_...
+STRIPE_SUCCESS_URL=https://your-frontend/billing/success?session_id={CHECKOUT_SESSION_ID}
+STRIPE_CANCEL_URL=https://your-frontend/billing/cancel
 ```
 
-If you keep the external billing microservice approach, continue using:
+Use monthly recurring Stripe Prices for Pro and Enterprise: paid message quotas reset after Stripe confirms a successful subscription-cycle invoice. Free quotas reset lazily when the user next accesses their subscription after each 30-day period. Webhook event IDs are persisted to prevent a replay from repeating subscription changes or quota resets.
 
-```env
-BILLING_SERVICE_URL=https://your-billing-service
-BILLING_WEBHOOK_TOKEN=your-internal-webhook-token
+Apply the database migration before deploying:
+
+```bash
+alembic upgrade head
 ```
 
 ## 🧪 Development
@@ -279,7 +247,7 @@ alembic revision --autogenerate -m "describe change"
    ```
 2. Update `.env` `DATABASE_URL` to PostgreSQL:
    ```env
-   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/optimos
+   DATABASE_URL=postgresql://postgres:postgres@   localhost:5433/optimos
    AUTO_CREATE_TABLES=false
    ```
 3. Apply schema:
@@ -296,7 +264,7 @@ If you need to migrate existing SQLite data, export/import rows with a one-time 
 This repo now includes a one-time helper script:
 
 ```bash
-python scripts/migrate_sqlite_to_postgres.py --postgres-url "postgresql://postgres:postgres@localhost:5432/optimos"
+python scripts/migrate_sqlite_to_postgres.py --postgres-url "postgresql://postgres:postgres@localhost:5433/optimos"
 ```
 
 Optional flags:
@@ -304,16 +272,9 @@ Optional flags:
 - `--sqlite-url "sqlite:///./optimos.db"` to choose a different source file
 - `--keep-target-data` to skip target truncation before copy
 
-## 📝 TODO
+## Product scope notes
 
-- [ ] Database integration (SQLAlchemy)
-- [ ] Admin dashboard endpoints
-- [ ] Stripe payment integration (see "Stripe Integration (Where To Add It)")
-- [ ] Email notifications
-- [ ] Rate limiting
-- [ ] Unit tests
-- [ ] Docker configuration
-- [ ] CI/CD pipeline
+The backend includes SQLAlchemy/Alembic persistence, admin API endpoints, rate limiting, automated tests, Docker support, CI workflows, email verification/password recovery, and Stripe Checkout/webhook handling. Product-specific notifications beyond account emails remain a separate feature.
 
 ## 🤝 Contributing
 

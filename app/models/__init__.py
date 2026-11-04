@@ -14,6 +14,7 @@ from app.models.opinion import Opinion
 from app.models.user_post import UserPost
 from app.models.global_dataset_item import GlobalDatasetItem
 from app.models.auth_action_token import AuthActionToken
+from app.models.billing_webhook_receipt import BillingWebhookReceipt
 
 __all__ = [
     "User",
@@ -31,4 +32,5 @@ __all__ = [
     "UserPost",
     "GlobalDatasetItem",
     "AuthActionToken",
+    "BillingWebhookReceipt",
 ]

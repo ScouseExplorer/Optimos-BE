@@ -46,13 +46,16 @@ class Settings(BaseSettings):
     # Microservice integration URLs
     AI_SERVICE_URL: str | None = None
     POST_ANALYSIS_SERVICE_URL: str | None = None
-    BILLING_SERVICE_URL: str | None = None
-    BILLING_WEBHOOK_TOKEN: str | None = None
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None
+    STRIPE_CREDIT_PRICE_ID: str | None = None
+    STRIPE_PRO_PRICE_ID: str | None = None
+    STRIPE_ENTERPRISE_PRICE_ID: str | None = None
     STRIPE_SUCCESS_URL: str | None = None
     STRIPE_CANCEL_URL: str | None = None
     MICROSERVICE_TIMEOUT_SECONDS: float = 10.0
+    # Paid tier changes must come from the billing webhook; keep False in production.
+    ALLOW_SELF_SERVICE_TIER_CHANGE: bool = False
 
     # Account verification and password recovery email delivery
     RESEND_API_KEY: str | None = None

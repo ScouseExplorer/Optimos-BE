@@ -92,7 +92,8 @@ Build settings UI with separate sections:
 ### 5) Subscription + Entitlements + Limits
 
 - `GET /api/subscriptions/me`
-- `POST /api/subscriptions/upgrade/{tier}` where tier is `free | pro | enterprise`
+- `POST /api/billing/subscription-intent` with `{ "tier": "pro" | "enterprise" }` to start paid checkout
+- `POST /api/billing/customer-portal` to open Stripe subscription management
 - `GET /api/subscriptions/usage`
 - `GET /api/subscriptions/entitlements`
 
@@ -106,6 +107,9 @@ Use entitlements response as the feature gate source of truth:
 - Transactions: `GET /api/credits/transactions?limit&offset`
 - Feature costs: `GET /api/credits/feature-costs`
 - Usage logs: `GET /api/usage/me?limit&offset`
+- Start a credit purchase: `POST /api/billing/purchase-intent` with `credits`, `success_url`, and `cancel_url`; both URLs must use the configured frontend origin.
+
+After returning from Checkout, refresh the wallet from the API; do not grant credits in the client.
 
 Render:
 - current credit balance

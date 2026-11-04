@@ -21,7 +21,14 @@ def _base_settings(**overrides):
         "MICROSERVICE_TIMEOUT_SECONDS": 10.0,
         "AI_SERVICE_URL": None,
         "POST_ANALYSIS_SERVICE_URL": None,
-        "BILLING_SERVICE_URL": None,
+        "STRIPE_SECRET_KEY": "sk_test_x",
+        "STRIPE_WEBHOOK_SECRET": "whsec_test",
+        "STRIPE_CREDIT_PRICE_ID": "price_credit",
+        "STRIPE_PRO_PRICE_ID": "price_pro",
+        "STRIPE_ENTERPRISE_PRICE_ID": "price_enterprise",
+        "STRIPE_SUCCESS_URL": "https://app.example.com/billing/success",
+        "STRIPE_CANCEL_URL": "https://app.example.com/billing/cancel",
+        "ALLOW_SELF_SERVICE_TIER_CHANGE": False,
         "REDIS_ENABLED": True,
         "REDIS_URL": "redis://localhost:6379/0",
         "RESEND_API_KEY": "re_test",
@@ -82,6 +89,36 @@ def test_production_with_redis_enabled_has_no_redis_error():
         REDIS_URL="redis://redis:6379/0",
     )
     assert validate_runtime_settings(settings) == []
+
+
+def test_production_requires_stripe_billing_configuration():
+    settings = _base_settings(
+        ENVIRONMENT="production",
+        SECRET_KEY="this-is-a-long-safe-secret-key-for-prod-123",
+        DATABASE_URL="postgresql://db/optimos",
+        STRIPE_SECRET_KEY=None,
+        STRIPE_WEBHOOK_SECRET=None,
+        STRIPE_PRO_PRICE_ID=None,
+        STRIPE_ENTERPRISE_PRICE_ID=None,
+        STRIPE_CREDIT_PRICE_ID=None,
+    )
+    errors = validate_runtime_settings(settings)
+    assert any("STRIPE_SECRET_KEY" in error for error in errors)
+    assert any("STRIPE_WEBHOOK_SECRET" in error for error in errors)
+    assert any("STRIPE_PRO_PRICE_ID" in error for error in errors)
+
+
+def test_production_rejects_self_service_paid_tier_changes():
+    settings = _base_settings(
+        ENVIRONMENT="production",
+        SECRET_KEY="this-is-a-long-safe-secret-key-for-prod-123",
+        DATABASE_URL="postgresql://db/optimos",
+        ALLOW_SELF_SERVICE_TIER_CHANGE=True,
+    )
+    assert any(
+        "ALLOW_SELF_SERVICE_TIER_CHANGE" in error
+        for error in validate_runtime_settings(settings)
+    )
 
 
 def test_production_requires_email_delivery_configuration():

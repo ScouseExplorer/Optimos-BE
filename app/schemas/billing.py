@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -12,9 +14,9 @@ class PurchaseIntentResponse(BaseModel):
     provider_intent_id: str
 
 
-class BillingWebhookEvent(BaseModel):
-    event_type: str
-    user_id: int
-    credits: int
-    reference_id: str
-    description: str | None = None
+class SubscriptionIntentRequest(BaseModel):
+    tier: Literal["pro", "enterprise"]
+
+
+class CustomerPortalResponse(BaseModel):
+    portal_url: str

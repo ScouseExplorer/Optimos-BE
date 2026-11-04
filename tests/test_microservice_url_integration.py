@@ -5,6 +5,7 @@ from app.models.user import User
 from app.services.ai.generation_service import GenerationService
 from app.services.billing_service import BillingService
 from app.services.post_analysis_service import PostAnalysisService
+from conftest import post_signed_stripe_event
 
 
 def auth_headers(token: str) -> dict:
@@ -133,8 +134,7 @@ def test_billing_purchase_intent_and_webhook_via_urls(client, monkeypatch):
             "provider_intent_id": "intent_123",
         }
 
-    monkeypatch.setattr(settings, "BILLING_SERVICE_URL", "http://billing-svc.local")
-    monkeypatch.setattr(settings, "BILLING_WEBHOOK_TOKEN", "billing-token")
+    monkeypatch.setattr(settings, "STRIPE_WEBHOOK_SECRET", "whsec_test")
     monkeypatch.setattr(BillingService, "create_purchase_intent", staticmethod(fake_create_purchase_intent))
 
     intent = client.post(
@@ -149,16 +149,25 @@ def test_billing_purchase_intent_and_webhook_via_urls(client, monkeypatch):
     assert intent.status_code == 200
     assert intent.json()["provider_intent_id"] == "intent_123"
 
-    webhook = client.post(
-        "/api/billing/webhooks",
-        headers={"X-Billing-Token": "billing-token"},
-        json={
-            "event_type": "credits.purchased",
-            "user_id": user["id"],
-            "credits": 30,
-            "reference_id": "intent_123",
-            "description": "Purchase completed",
+    webhook = post_signed_stripe_event(
+        client,
+        {
+            "id": "evt_ms_credit_123",
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_ms_credit_123",
+                    "mode": "payment",
+                    "payment_status": "paid",
+                    "metadata": {
+                        "purchase_type": "credits",
+                        "user_id": str(user["id"]),
+                        "credits": "30",
+                    },
+                }
+            },
         },
+        "whsec_test",
     )
     assert webhook.status_code == 202
 

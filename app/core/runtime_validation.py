@@ -46,7 +46,6 @@ def validate_runtime_settings(settings: Settings) -> list[str]:
     for field_name in [
         "AI_SERVICE_URL",
         "POST_ANALYSIS_SERVICE_URL",
-        "BILLING_SERVICE_URL",
     ]:
         value = getattr(settings, field_name)
         if not value:
@@ -77,11 +76,33 @@ def validate_runtime_settings(settings: Settings) -> list[str]:
         if settings.LOG_LEVEL.strip().upper() == "DEBUG":
             errors.append("LOG_LEVEL cannot be DEBUG for production/staging")
 
+        if settings.ALLOW_SELF_SERVICE_TIER_CHANGE:
+            errors.append("ALLOW_SELF_SERVICE_TIER_CHANGE must be false for production/staging")
+
         if not settings.RESEND_API_KEY:
             errors.append("RESEND_API_KEY must be set for production/staging")
 
         if not settings.EMAIL_FROM:
             errors.append("EMAIL_FROM must be set for production/staging")
+
+        for field_name in [
+            "STRIPE_SECRET_KEY",
+            "STRIPE_WEBHOOK_SECRET",
+            "STRIPE_CREDIT_PRICE_ID",
+            "STRIPE_PRO_PRICE_ID",
+            "STRIPE_ENTERPRISE_PRICE_ID",
+            "STRIPE_SUCCESS_URL",
+            "STRIPE_CANCEL_URL",
+        ]:
+            if not getattr(settings, field_name, None):
+                errors.append(f"{field_name} must be set for production/staging")
+
+        for field_name in ["STRIPE_SUCCESS_URL", "STRIPE_CANCEL_URL"]:
+            value = getattr(settings, field_name, None)
+            if value:
+                parsed = urlparse(value)
+                if parsed.scheme != "https" or not parsed.netloc:
+                    errors.append(f"{field_name} must be a valid HTTPS URL in production/staging")
 
         frontend_url = urlparse(settings.FRONTEND_URL)
         if (

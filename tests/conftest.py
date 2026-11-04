@@ -1,6 +1,10 @@
 import os
 import re
+import hashlib
+import hmac
+import json
 from pathlib import Path
+from time import time
 from uuid import uuid4
 
 import pytest
@@ -11,8 +15,11 @@ from sqlalchemy.orm import sessionmaker
 
 
 TEST_DB_PATH = Path(f"./test_optimos_{uuid4().hex}.db").resolve()
-os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH.as_posix()}"
+# Set TEST_DATABASE_URL to run the suite against PostgreSQL instead of SQLite.
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{TEST_DB_PATH.as_posix()}"
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["AUTO_CREATE_TABLES"] = "false"
+os.environ["ALLOW_SELF_SERVICE_TIER_CHANGE"] = "true"  # legacy tests upgrade via API
 os.environ["RATE_LIMIT_DEFAULT_REQUESTS"] = "10000"
 os.environ["RATE_LIMIT_AUTH_REQUESTS"] = "10000"
 os.environ["RATE_LIMIT_AI_REQUESTS"] = "10000"
@@ -38,10 +45,8 @@ def engine():
         deprecated="auto",
     )
 
-    db_engine = create_engine(
-        f"sqlite:///{TEST_DB_PATH.as_posix()}",
-        connect_args={"check_same_thread": False},
-    )
+    connect_args = {"check_same_thread": False} if TEST_DATABASE_URL.startswith("sqlite") else {}
+    db_engine = create_engine(TEST_DATABASE_URL, connect_args=connect_args)
     Base.metadata.create_all(bind=db_engine)
     yield db_engine
     Base.metadata.drop_all(bind=db_engine)
@@ -106,6 +111,18 @@ def confirm_registered_email(client, email: str) -> None:
         json={"token": token},
     )
     assert response.status_code == 200
+
+
+def post_signed_stripe_event(client, event: dict, secret: str):
+    timestamp = int(time())
+    payload = json.dumps(event, separators=(",", ":")).encode("utf-8")
+    signed_payload = str(timestamp).encode("ascii") + b"." + payload
+    digest = hmac.new(secret.encode("utf-8"), signed_payload, hashlib.sha256).hexdigest()
+    return client.post(
+        "/api/billing/webhooks",
+        content=payload,
+        headers={"Stripe-Signature": f"t={timestamp},v1={digest}"},
+    )
 
 
 def auth_headers(token: str) -> dict:

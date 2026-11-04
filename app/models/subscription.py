@@ -1,6 +1,6 @@
 """Subscription model for user tiers and billing."""
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.base import Base
@@ -19,7 +19,10 @@ class Subscription(Base, AuditMixin):
     messages_limit = Column(Integer, default=100)  # monthly message limit
     messages_used = Column(Integer, default=0)  # current month usage
     renews_at = Column(DateTime, nullable=True, index=True)  # next billing date
+    usage_resets_at = Column(DateTime, nullable=True, index=True)
     cancelled_at = Column(DateTime, nullable=True)
+    stripe_subscription_id = Column(String(255), nullable=True, unique=True, index=True)
+    stripe_customer_id = Column(String(255), nullable=True, index=True)
     
     # Relationship
     user = relationship("User", back_populates="subscription")

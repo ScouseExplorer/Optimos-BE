@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.schemas.user import UserCreate, User
@@ -28,15 +28,6 @@ user_service = UserService()
 # Request/Response Models
 class EmailVerificationRequest(BaseModel):
     token: str
-
-
-class PasswordResetRequest(BaseModel):
-    email: EmailStr
-
-
-class PasswordResetConfirm(BaseModel):
-    token: str
-    new_password: str
 
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
@@ -159,8 +150,7 @@ async def confirm_password_reset(
 @router.post("/verify-email")
 async def verify_email(request: EmailVerificationRequest, db: Session = Depends(get_db)):
     """Verify user email with token."""
-    user, success = EmailVerificationService.verify_email_token(db, request.token)
-    if not success:
+    if not AuthActionService.consume_email_verification(db, request.token):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired verification token"
