@@ -3,7 +3,8 @@
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.core.security import get_password_hash
-from datetime import datetime, timedelta
+from app.core.time import utcnow
+from datetime import timedelta
 import secrets
 import logging
 
@@ -82,7 +83,7 @@ class EmailVerificationService:
             
             token = EmailVerificationService.generate_token()
             user.password_reset_token = token
-            user.password_reset_expires_at = datetime.utcnow() + timedelta(hours=1)
+            user.password_reset_expires_at = utcnow() + timedelta(hours=1)
             db.commit()
             
             return token, True
@@ -103,7 +104,7 @@ class EmailVerificationService:
                 return None, False
             
             # Check if token expired
-            if user.password_reset_expires_at < datetime.utcnow():
+            if user.password_reset_expires_at < utcnow():
                 user.password_reset_token = None
                 user.password_reset_expires_at = None
                 db.commit()

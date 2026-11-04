@@ -1,9 +1,9 @@
 """Service for profile, notification preferences, and security settings."""
 
-from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
 
+from app.core.time import utcnow
 from app.models.profile import UserProfile
 from app.models.notification_preferences import NotificationPreferences
 from app.models.security_settings import SecuritySettings
@@ -113,7 +113,7 @@ class ProfileService:
             .first()
         )
         if settings:
-            settings.last_login_at = datetime.utcnow()
+            settings.last_login_at = utcnow()
             settings.last_login_ip = ip_address
             settings.failed_login_attempts = 0
             db.commit()
@@ -130,5 +130,5 @@ class ProfileService:
             settings.failed_login_attempts += 1
             if settings.failed_login_attempts >= 10:
                 from datetime import timedelta
-                settings.locked_until = datetime.utcnow() + timedelta(minutes=30)
+                settings.locked_until = utcnow() + timedelta(minutes=30)
             db.commit()

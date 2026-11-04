@@ -1,8 +1,8 @@
 """SecuritySettings model — per-user security configuration and tracking."""
 
-from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
+from app.core.time import utcnow
 from app.db.base import Base
 from app.db.mixins import AuditMixin
 
@@ -26,7 +26,7 @@ class SecuritySettings(Base, AuditMixin):
     # Login tracking
     last_login_at = Column(DateTime, nullable=True)
     last_login_ip = Column(String(45), nullable=True)   # supports IPv6
-    password_changed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    password_changed_at = Column(DateTime, default=utcnow, nullable=False)
 
     # Lockout tracking
     failed_login_attempts = Column(Integer, default=0, nullable=False)

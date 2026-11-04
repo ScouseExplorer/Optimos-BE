@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 from app.models.subscription import Subscription
+from app.core.time import utcnow
 from datetime import datetime, timedelta
 
 
@@ -13,7 +14,7 @@ class SubscriptionService:
         """Get subscription or create default for new user."""
         subscription = db.query(Subscription).filter(Subscription.user_id == user_id).first()
         if not subscription:
-            now = datetime.utcnow()
+            now = utcnow()
             subscription = Subscription(
                 user_id=user_id,
                 tier="free",
@@ -46,7 +47,7 @@ class SubscriptionService:
         now: datetime | None = None,
     ) -> None:
         """Renew free-tier usage lazily while preserving the original 30-day cadence."""
-        now = now or datetime.utcnow()
+        now = now or utcnow()
         if subscription.tier != "free" or subscription.status != "active":
             return
 
@@ -70,7 +71,7 @@ class SubscriptionService:
         """Upgrade user's subscription tier."""
         subscription = db.query(Subscription).filter(Subscription.user_id == user_id).first()
         if subscription:
-            now = datetime.utcnow()
+            now = utcnow()
             subscription.tier = tier
             subscription.status = "active"
             subscription.messages_limit = SubscriptionService.TIER_LIMITS[tier]

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from datetime import datetime, timedelta
+from app.core.time import utcnow
 from app.db.session import get_db
 from app.auth.dependencies import get_current_active_user
 from app.models.user import User
@@ -43,7 +44,7 @@ async def get_dashboard_stats(
     total_users = db.query(func.count(User.id)).scalar()
     
     # Signups today
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     signups_today = db.query(func.count(User.id)).filter(
         User.created_at >= today_start
     ).scalar()
@@ -157,7 +158,7 @@ async def get_chat_stats(
     
     stats = []
     for i in range(days):
-        date = datetime.utcnow() - timedelta(days=i)
+        date = utcnow() - timedelta(days=i)
         date_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
         date_end = date_start + timedelta(days=1)
         

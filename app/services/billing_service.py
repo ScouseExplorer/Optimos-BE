@@ -3,6 +3,8 @@ import hmac
 import logging
 import time
 from datetime import datetime, timedelta, timezone
+
+from app.core.time import utcnow
 from urllib.parse import urlparse
 
 import httpx
@@ -450,7 +452,7 @@ class BillingService:
                 detail="Stripe subscription has an invalid billing period end",
             ) from exc
 
-        now = datetime.utcnow()
+        now = utcnow()
         db.add(
             BillingWebhookReceipt(
                 provider_event_id=event_id,

@@ -8,6 +8,9 @@ from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Longest token lifetime we issue (refresh tokens default to 7 days).
+MAX_TOKEN_LIFETIME_SECONDS = 7 * 24 * 3600
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password against hash."""
@@ -74,7 +77,10 @@ def get_token_remaining_ttl(token: str) -> int:
     """Return remaining lifetime of a token in seconds (minimum 1).
 
     Decodes without verifying expiry so we can read the exp claim even
-    from an already-expired token — useful for setting blacklist TTLs.
+    from an already-expired token, which is useful for setting blacklist TTLs.
+    A token that fails signature verification can never be accepted, so it
+    only needs the minimum TTL. A validly signed token with no exp claim is
+    blacklisted for the longest lifetime we issue.
     """
     try:
         payload = jwt.decode(
@@ -83,8 +89,9 @@ def get_token_remaining_ttl(token: str) -> int:
             algorithms=[settings.ALGORITHM],
             options={"verify_exp": False},
         )
-        exp = payload.get("exp", 0)
-        remaining = int(exp - _time.time())
-        return max(remaining, 1)
-    except Exception:
-        return 3600  # safe fallback
+    except JWTError:
+        return 1
+    exp = payload.get("exp")
+    if not isinstance(exp, (int, float)):
+        return MAX_TOKEN_LIFETIME_SECONDS
+    return max(int(exp - _time.time()), 1)

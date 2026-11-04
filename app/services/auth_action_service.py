@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import timedelta
 from urllib.parse import quote
 
 from sqlalchemy import update
@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import get_password_hash
+from app.core.time import utcnow
 from app.models.auth_action_token import AuthActionToken
 from app.models.security_settings import SecuritySettings
 from app.models.user import User
@@ -31,7 +32,7 @@ class AuthActionService:
         subject: str,
         path: str,
     ) -> None:
-        now = datetime.utcnow()
+        now = utcnow()
         token = secrets.token_urlsafe(32)
         db.query(AuthActionToken).filter(
             AuthActionToken.user_id == user.id,
@@ -80,7 +81,7 @@ class AuthActionService:
 
     @staticmethod
     def consume_email_verification(db: Session, token: str) -> bool:
-        now = datetime.utcnow()
+        now = utcnow()
         token_hash = AuthActionService._hash_token(token)
         action = (
             db.query(AuthActionToken)
@@ -125,7 +126,7 @@ class AuthActionService:
 
     @staticmethod
     def reset_password(db: Session, token: str, password: str) -> bool:
-        now = datetime.utcnow()
+        now = utcnow()
         token_hash = AuthActionService._hash_token(token)
         action = (
             db.query(AuthActionToken)

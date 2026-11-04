@@ -11,7 +11,8 @@ from app.models.profile import UserProfile
 from app.models.notification_preferences import NotificationPreferences
 from app.models.security_settings import SecuritySettings
 from app.models.credit_wallet import CreditWallet
-from datetime import datetime, timedelta
+from app.core.time import utcnow
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ class UserService:
             status="active",
             messages_limit=100,
             messages_used=0,
-            renews_at=datetime.utcnow() + timedelta(days=30),
+            renews_at=utcnow() + timedelta(days=30),
         )
         db.add(subscription)
 
@@ -103,7 +104,7 @@ class UserService:
 
         # Enforce account lockout before touching the password
         security = db.query(SecuritySettings).filter(SecuritySettings.user_id == user.id).first()
-        if security and security.locked_until and security.locked_until > datetime.utcnow():
+        if security and security.locked_until and security.locked_until > utcnow():
             raise HTTPException(
                 status_code=status.HTTP_423_LOCKED,
                 detail="Account temporarily locked due to too many failed attempts. Try again in 30 minutes.",
@@ -114,7 +115,7 @@ class UserService:
             if security:
                 security.failed_login_attempts += 1
                 if security.failed_login_attempts >= 10:
-                    security.locked_until = datetime.utcnow() + timedelta(minutes=30)
+                    security.locked_until = utcnow() + timedelta(minutes=30)
                 db.commit()
             return None
 

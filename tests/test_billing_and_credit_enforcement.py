@@ -1,4 +1,6 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
+
+from app.core.time import utcnow
 from sqlalchemy.orm import Session
 
 from app.models.feature_cost import FeatureCost
@@ -381,7 +383,7 @@ def test_paid_subscription_quota_resets_only_after_successful_renewal(client, mo
     try:
         subscription = db.query(Subscription).filter_by(user_id=user["id"]).one()
         subscription.messages_used = 42
-        subscription.usage_resets_at = datetime.utcnow() - timedelta(days=1)
+        subscription.usage_resets_at = utcnow() - timedelta(days=1)
         db.commit()
     finally:
         db.close()
@@ -423,7 +425,7 @@ def test_free_subscription_quota_renews_on_30_day_period(client, db_session_fact
     try:
         subscription = db.query(Subscription).filter_by(user_id=user["id"]).one()
         subscription.messages_used = subscription.messages_limit
-        subscription.usage_resets_at = datetime.utcnow() - timedelta(days=31)
+        subscription.usage_resets_at = utcnow() - timedelta(days=31)
         db.commit()
     finally:
         db.close()
