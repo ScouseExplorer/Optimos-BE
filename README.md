@@ -156,13 +156,13 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 RESEND_API_KEY=re_...
 EMAIL_FROM=Optimos <noreply@your-domain.example>
 FRONTEND_URL=https://app.your-domain.example
-DATABASE_URL=sqlite:///./optimos.db
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/optimos
 REDIS_ENABLED=true
 REDIS_URL=redis://localhost:6379/0
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 ```
 
-For local PostgreSQL development, use:
+For local PostgreSQL development, start the database with `docker compose up -d postgres redis` (published on host port `5433`) and use these values:
 
 ```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/optimos
@@ -238,6 +238,10 @@ Use Alembic for schema changes:
 alembic upgrade head
 alembic revision --autogenerate -m "describe change"
 ```
+
+### Running Tests
+
+Tests run against PostgreSQL. Start the database (`docker compose up -d postgres`) and run `pytest`. The suite uses a separate `optimos_test` database on `localhost:5433` and creates it if missing. Set `TEST_DATABASE_URL` to use another PostgreSQL server; its database name must end in `_test` because the schema is dropped between tests.
 
 ### Migrate from SQLite to PostgreSQL (local)
 

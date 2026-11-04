@@ -3,20 +3,25 @@ import re
 import hashlib
 import hmac
 import json
-from pathlib import Path
 from time import time
-from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from passlib.context import CryptContext
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 
-TEST_DB_PATH = Path(f"./test_optimos_{uuid4().hex}.db").resolve()
-# Set TEST_DATABASE_URL to run the suite against PostgreSQL instead of SQLite.
-TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{TEST_DB_PATH.as_posix()}"
+# Tests run against PostgreSQL (docker compose up -d postgres). Override with TEST_DATABASE_URL.
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5433/optimos_test",
+)
+_test_url = make_url(TEST_DATABASE_URL)
+# The schema is dropped between tests, so refuse to point at anything but a dedicated test database.
+if _test_url.get_backend_name() != "postgresql" or not (_test_url.database or "").endswith("_test"):
+    raise RuntimeError("TEST_DATABASE_URL must be a PostgreSQL database whose name ends with '_test'")
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["AUTO_CREATE_TABLES"] = "false"
 os.environ["ALLOW_SELF_SERVICE_TIER_CHANGE"] = "true"  # legacy tests upgrade via API
@@ -45,8 +50,19 @@ def engine():
         deprecated="auto",
     )
 
-    connect_args = {"check_same_thread": False} if TEST_DATABASE_URL.startswith("sqlite") else {}
-    db_engine = create_engine(TEST_DATABASE_URL, connect_args=connect_args)
+    admin_engine = create_engine(
+        _test_url.set(database="postgres"), isolation_level="AUTOCOMMIT"
+    )
+    with admin_engine.connect() as conn:
+        exists = conn.execute(
+            text("SELECT 1 FROM pg_database WHERE datname = :name"),
+            {"name": _test_url.database},
+        ).scalar()
+        if not exists:
+            conn.execute(text(f'CREATE DATABASE "{_test_url.database}"'))
+    admin_engine.dispose()
+
+    db_engine = create_engine(_test_url)
     Base.metadata.create_all(bind=db_engine)
     yield db_engine
     Base.metadata.drop_all(bind=db_engine)
