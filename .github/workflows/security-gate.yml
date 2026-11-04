@@ -23,6 +23,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
+      PYTHONPATH: ${{ github.workspace }}
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/optimos_test
       ENVIRONMENT: production
       SECRET_KEY: this-is-a-long-safe-secret-key-for-ci-validation-123
@@ -34,6 +35,16 @@ jobs:
       RATE_LIMIT_AUTH_REQUESTS: "20"
       RATE_LIMIT_AI_REQUESTS: "40"
       RATE_LIMIT_ADMIN_REQUESTS: "30"
+      RESEND_API_KEY: re_ci_placeholder
+      EMAIL_FROM: Optimos CI <ci@example.com>
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+      STRIPE_CREDIT_PRICE_ID: price_ci_credit
+      STRIPE_PRO_PRICE_ID: price_ci_pro
+      STRIPE_ENTERPRISE_PRICE_ID: price_ci_enterprise
+      STRIPE_SUCCESS_URL: https://app.example.com/billing/success
+      STRIPE_CANCEL_URL: https://app.example.com/billing/cancel
+      FRONTEND_URL: https://app.example.com
 
     steps:
       - name: Checkout
