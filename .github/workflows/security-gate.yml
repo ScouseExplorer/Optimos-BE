@@ -50,11 +50,22 @@ jobs:
           pip install -r requirements.txt
 
       - name: Validate runtime security configuration
+        env:
+          PYTHONPATH: .
+          RESEND_API_KEY: re_ci_placeholder
+          EMAIL_FROM: Optimos <noreply@example.com>
+          FRONTEND_URL: https://app.example.com
+          STRIPE_SECRET_KEY: sk_test_ci_placeholder
+          STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+          STRIPE_CREDIT_PRICE_ID: price_ci_credit
+          STRIPE_PRO_PRICE_ID: price_ci_pro
+          STRIPE_ENTERPRISE_PRICE_ID: price_ci_enterprise
+          STRIPE_SUCCESS_URL: https://app.example.com/billing/success
+          STRIPE_CANCEL_URL: https://app.example.com/billing/cancel
         run: python scripts/validate_runtime_config.py
 
-      - name: Run critical security tests
-        run: |
-          pytest -q tests/test_runtime_config_validation.py
-          pytest -q tests/test_auth_and_isolation.py
-          pytest -q tests/test_credits_security.py
-          pytest -q tests/test_health_and_errors.py
+      # The suite enables dev-only behaviour, so it must not run with ENVIRONMENT=production.
+      - name: Run tests
+        env:
+          ENVIRONMENT: development
+        run: pytest -q
